@@ -1,103 +1,99 @@
+/* ========== СБРОС СТИЛЕЙ ========== */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Segoe UI', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
+/* ========== ОСНОВНОЙ КОНТЕЙНЕР ========== */
 body {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-color: #f8f9fa;
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 15px;
+    padding: 16px;
+    color: #2c3e50;
 }
 
 .container {
     background: white;
-    border-radius: 20px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
-    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    padding: 32px 28px;
     width: 100%;
-    max-width: 380px;
+    max-width: 400px;
+    border: 1px solid #e9ecef;
 }
 
+/* ========== ШАПКА ========== */
 .header {
     text-align: center;
-    margin-bottom: 25px;
+    margin-bottom: 28px;
 }
 
 .logo {
     font-size: 48px;
-    margin-bottom: 15px;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+    margin-bottom: 16px;
+    color: #495057;
+    opacity: 0.9;
 }
 
 h1 {
-    color: #333;
+    color: #212529;
     font-size: 24px;
+    font-weight: 600;
     margin-bottom: 8px;
-    font-weight: 700;
+    letter-spacing: -0.3px;
 }
 
 .subtitle {
-    color: #666;
+    color: #6c757d;
     font-size: 14px;
-    line-height: 1.4;
+    line-height: 1.5;
+    opacity: 0.8;
 }
 
-.gift-list {
+/* ========== ИНФОРМАЦИЯ О ПОДАРКЕ ========== */
+.gift-info {
     background: #f8f9fa;
-    border-radius: 15px;
-    padding: 18px;
-    margin-bottom: 25px;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 28px;
+    border: 1px solid #e9ecef;
 }
 
 .gift-item {
     display: flex;
     align-items: center;
     margin-bottom: 12px;
-    padding: 10px;
-    background: white;
-    border-radius: 10px;
-    border: 1px solid #e9ecef;
+    color: #495057;
+}
+
+.gift-item:last-child {
+    margin-bottom: 0;
 }
 
 .gift-icon {
-    font-size: 22px;
     margin-right: 12px;
-    min-width: 30px;
+    font-size: 18px;
+    opacity: 0.9;
 }
 
 .gift-text {
-    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
 }
 
-.gift-title {
-    font-weight: 700;
-    color: #333;
-    margin-bottom: 2px;
-    font-size: 14px;
-}
-
-.gift-desc {
-    color: #6c757d;
-    font-size: 12px;
-    line-height: 1.3;
-}
-
+/* ========== ИНДИКАТОР ШАГОВ ========== */
 .step-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 32px;
 }
 
 .step {
@@ -105,130 +101,169 @@ h1 {
     height: 32px;
     border-radius: 50%;
     background: #e9ecef;
-    color: #6c757d;
+    color: #adb5bd;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 14px;
-    transition: all 0.3s;
+    transition: all 0.3s ease;
 }
 
 .step.active {
-    background: #4361ee;
+    background: #495057;
     color: white;
-    box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
 }
 
 .step.completed {
-    background: #4cc9f0;
+    background: #28a745;
     color: white;
 }
 
 .line {
-    width: 50px;
-    height: 3px;
+    width: 40px;
+    height: 2px;
     background: #e9ecef;
-    margin: 0 5px;
-    transition: all 0.3s;
+    margin: 0 8px;
+    transition: all 0.3s ease;
 }
 
 .line.active {
-    background: #4361ee;
+    background: #495057;
 }
 
-h2 {
-    color: #333;
-    font-size: 18px;
-    margin-bottom: 10px;
-    text-align: center;
-    font-weight: 600;
+/* ========== ФОРМЫ ========== */
+.form-step {
+    animation: fadeIn 0.3s ease;
 }
 
-.form-description {
-    color: #666;
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 13px;
-    line-height: 1.4;
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .form-group {
-    margin-bottom: 18px;
+    margin-bottom: 24px;
 }
 
 label {
     display: block;
     color: #495057;
     font-weight: 600;
-    margin-bottom: 6px;
-    font-size: 13px;
+    font-size: 14px;
+    margin-bottom: 8px;
 }
 
-input {
+/* ========== ВЫБОР СТРАНЫ ========== */
+.country-select {
     width: 100%;
-    padding: 14px;
-    border: 2px solid #dee2e6;
+    padding: 14px 16px;
+    border: 1px solid #dee2e6;
     border-radius: 10px;
-    font-size: 16px;
-    transition: all 0.3s;
-    outline: none;
+    font-size: 15px;
     background: white;
+    color: #495057;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236c757d' d='M6 8.825L1.175 4 2.238 2.938 6 6.7l3.763-3.762L10.825 4z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 12px;
 }
 
-input:focus {
-    border-color: #4361ee;
-    box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+.country-select:focus {
+    outline: none;
+    border-color: #495057;
+    box-shadow: 0 0 0 3px rgba(73, 80, 87, 0.1);
 }
 
-.input-with-flag {
+/* ========== ВВОД ТЕЛЕФОНА ========== */
+.phone-input {
     display: flex;
     align-items: center;
-    border: 2px solid #dee2e6;
+    border: 1px solid #dee2e6;
     border-radius: 10px;
     overflow: hidden;
-    background: white;
+    transition: border-color 0.3s;
+}
+
+.phone-input:focus-within {
+    border-color: #495057;
+    box-shadow: 0 0 0 3px rgba(73, 80, 87, 0.1);
 }
 
 .country-code {
-    padding: 14px 15px;
+    padding: 14px 16px;
     background: #f8f9fa;
     color: #495057;
-    font-weight: 700;
-    border-right: 2px solid #dee2e6;
-    font-size: 16px;
-}
-
-.input-with-flag input {
-    border: none;
-    padding-left: 12px;
-}
-
-.code-input {
+    font-weight: 600;
+    font-size: 15px;
+    border-right: 1px solid #dee2e6;
+    min-width: 60px;
     text-align: center;
-    font-size: 20px;
-    letter-spacing: 8px;
-    font-weight: 700;
-    font-family: 'Courier New', monospace;
 }
 
+.phone-input input {
+    flex: 1;
+    border: none;
+    padding: 14px 16px;
+    font-size: 15px;
+    color: #495057;
+    background: white;
+}
+
+.phone-input input:focus {
+    outline: none;
+}
+
+.phone-input input::placeholder {
+    color: #adb5bd;
+}
+
+/* ========== ВВОД КОДА ========== */
+.code-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    font-size: 18px;
+    text-align: center;
+    letter-spacing: 8px;
+    font-weight: 500;
+    color: #495057;
+    background: white;
+    transition: border-color 0.3s;
+}
+
+.code-input:focus {
+    outline: none;
+    border-color: #495057;
+    box-shadow: 0 0 0 3px rgba(73, 80, 87, 0.1);
+}
+
+/* ========== КНОПКИ ========== */
 .btn-primary {
     width: 100%;
     padding: 16px;
-    background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+    background: #495057;
     color: white;
     border: none;
     border-radius: 10px;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
     margin-bottom: 12px;
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(67, 97, 238, 0.3);
+    background: #343a40;
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
 }
 
 .btn-secondary {
@@ -236,40 +271,61 @@ input:focus {
     padding: 14px;
     background: white;
     color: #495057;
-    border: 2px solid #dee2e6;
+    border: 1px solid #dee2e6;
     border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.3s;
 }
 
 .btn-secondary:hover {
     background: #f8f9fa;
+    border-color: #adb5bd;
 }
 
-.timer {
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-    border: 2px solid #ffd43b;
-    border-radius: 10px;
-    padding: 12px;
-    text-align: center;
-    margin-top: 15px;
+/* ========== ЗАМЕТКИ ========== */
+.note {
+    color: #6c757d;
     font-size: 13px;
-    color: #856404;
+    line-height: 1.5;
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+/* ========== ПОВТОРНАЯ ОТПРАВКА ========== */
+.resend {
+    text-align: center;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.resend a {
+    color: #495057;
+    text-decoration: none;
     font-weight: 600;
 }
 
+.resend a:hover {
+    text-decoration: underline;
+}
+
+/* ========== ЗАГРУЗКА ========== */
 .loading {
     text-align: center;
-    padding: 40px 20px;
+    padding: 48px 24px;
 }
 
 .spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #4361ee;
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e9ecef;
+    border-top: 3px solid #495057;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto 20px;
@@ -280,70 +336,133 @@ input:focus {
     100% { transform: rotate(360deg); }
 }
 
+.loading p {
+    color: #495057;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.loading .small {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+/* ========== УСПЕХ ========== */
 .success {
     text-align: center;
-    padding: 40px 20px;
+    padding: 48px 24px;
 }
 
 .success-icon {
     font-size: 48px;
-    color: #4CAF50;
+    color: #28a745;
     margin-bottom: 20px;
+    font-weight: 300;
 }
 
 .success h2 {
-    color: #4CAF50;
-    margin-bottom: 12px;
+    color: #212529;
     font-size: 22px;
+    margin-bottom: 12px;
+    font-weight: 600;
 }
 
+.success p {
+    color: #495057;
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.success .small {
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 16px;
+}
+
+/* ========== ОШИБКА ========== */
 .error {
     text-align: center;
-    padding: 40px 20px;
+    padding: 48px 24px;
 }
 
 .error-icon {
     font-size: 48px;
-    color: #f44336;
+    color: #dc3545;
     margin-bottom: 20px;
+    font-weight: 300;
 }
 
 .error h2 {
-    color: #f44336;
+    color: #212529;
+    font-size: 22px;
     margin-bottom: 12px;
+    font-weight: 600;
 }
 
-@media (max-width: 400px) {
+.error p {
+    color: #495057;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+/* ========== АДАПТИВНОСТЬ ========== */
+@media (max-width: 420px) {
     .container {
-        padding: 20px;
-        border-radius: 15px;
+        padding: 24px 20px;
+        border-radius: 12px;
     }
     
     h1 {
-        font-size: 20px;
+        font-size: 22px;
     }
     
     .logo {
-        font-size: 40px;
+        font-size: 42px;
     }
     
     .step {
         width: 28px;
         height: 28px;
-        font-size: 12px;
+        font-size: 13px;
     }
     
     .line {
         width: 30px;
     }
     
-    input {
-        padding: 12px;
-        font-size: 15px;
+    .country-select,
+    .phone-input input,
+    .code-input {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+    
+    .country-code {
+        padding: 12px 14px;
+        font-size: 14px;
+        min-width: 55px;
     }
     
     .btn-primary {
         padding: 14px;
         font-size: 15px;
     }
+}
+
+/* ========== УТИЛИТЫ ========== */
+.form-description {
+    color: #6c757d;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 28px;
+    line-height: 1.5;
+}
+
+h2 {
+    color: #212529;
+    font-size: 20px;
+    text-align: center;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
 }
